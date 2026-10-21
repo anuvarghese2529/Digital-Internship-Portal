@@ -1,0 +1,15 @@
+# Sensitive configuration
+config/database.php
+config/db.php
+.env
+
+# Uploaded files and private documents
+uploads/
+assets/uploads/
+*.sql
+
+# Temporary files
+*.log
+.DS_Store
+Thumbs.db
+config/db.php
