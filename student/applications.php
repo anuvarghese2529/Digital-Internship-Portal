@@ -547,6 +547,82 @@ body {
 
 }
 
+
+/* APPLICATIONS TABLE */
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+}
+.applications-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 950px;
+}
+.applications-table th {
+    background: #667eea;
+    color: #fff;
+    text-align: left;
+    padding: 15px 12px;
+    font-size: 14px;
+    white-space: nowrap;
+}
+.applications-table td {
+    padding: 14px 12px;
+    border-bottom: 1px solid #e8eaf0;
+    color: #444;
+    vertical-align: middle;
+    font-size: 14px;
+}
+.applications-table tbody tr:nth-child(even) { background: #f8f9ff; }
+.applications-table tbody tr:hover { background: #f0f2ff; }
+.applications-table tbody tr:last-child td { border-bottom: none; }
+.internship-title { font-weight: bold; color: #333 !important; }
+.status {
+    display: inline-block;
+    padding: 6px 10px;
+    border-radius: 18px;
+    font-weight: bold;
+    font-size: 12px;
+    white-space: nowrap;
+}
+.pending { background: #fff3cd; color: #856404; }
+.shortlisted { background: #d4edda; color: #155724; }
+.rejected { background: #f8d7da; color: #721c24; }
+.mock-cell { line-height: 1.8; min-width: 130px; }
+.mock-pass { color: #198754; font-weight: bold; }
+.mock-fail { color: #dc3545; font-weight: bold; }
+.mock-pending { color: #856404; font-weight: bold; }
+.actions-cell { min-width: 135px; }
+.table-action {
+    display: inline-block;
+    padding: 8px 10px;
+    border-radius: 6px;
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 12px;
+    white-space: nowrap;
+    margin-bottom: 7px;
+}
+.mock-action { background: #667eea; }
+.mock-action:hover { background: #5568d8; }
+.completed-label { display: inline-block; color: #198754; font-weight: bold; margin-bottom: 7px; }
+.table-cancel-form { margin-top: 3px; }
+.cancel-btn {
+    padding: 7px 10px;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 12px;
+}
+.cancel-btn:hover { background: #c82333; }
+
 </style>
 
 </head>
@@ -606,524 +682,129 @@ body {
 
     <?php if (mysqli_num_rows($result) > 0): ?>
 
-
-        <?php while ($row = mysqli_fetch_assoc($result)): ?>
-
-
+    <div class="table-container">
+        <table class="applications-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Internship</th>
+                    <th>Company</th>
+                    <th>Location</th>
+                    <th>Applied On</th>
+                    <th>Application Status</th>
+                    <th>Mock Test</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
             <?php
+            $row_number = 1;
+            while ($row = mysqli_fetch_assoc($result)):
+                $status = strtolower(trim($row["status"] ?? "pending"));
 
-            /* ==================================================
-               APPLICATION STATUS
-            ================================================== */
-
-            $status = strtolower(
-                trim(
-                    $row["status"] ?? "Pending"
-                )
-            );
-
-
-            if ($status === "shortlisted") {
-
-                $status_class = "shortlisted";
-                $status_text = "Shortlisted";
-
-            } elseif ($status === "rejected") {
-
-                $status_class = "rejected";
-                $status_text = "Rejected";
-
-            } else {
-
-                $status_class = "pending";
-                $status_text = "Pending";
-            }
-
-
-            /* ==================================================
-               GET MOCK TEST RESULTS FOR THIS APPLICATION
-            ================================================== */
-
-            $application_id =
-                (int)$row["id"];
-
-
-            $test_sql = "
-                SELECT
-                    id,
-                    level,
-                    score,
-                    total_questions,
-                    percentage,
-                    passed,
-                    created_at
-
-                FROM test_results
-
-                WHERE application_id = ?
-
-                ORDER BY id DESC
-            ";
-
-
-            $test_stmt =
-                mysqli_prepare(
-                    $conn,
-                    $test_sql
-                );
-
-
-            $test_results = [];
-
-            $final_level2_passed = false;
-
-
-            if ($test_stmt) {
-
-                mysqli_stmt_bind_param(
-                    $test_stmt,
-                    "i",
-                    $application_id
-                );
-
-                mysqli_stmt_execute(
-                    $test_stmt
-                );
-
-                $test_result =
-                    mysqli_stmt_get_result(
-                        $test_stmt
-                    );
-
-
-                while (
-                    $test_row =
-                    mysqli_fetch_assoc(
-                        $test_result
-                    )
-                ) {
-
-                    $test_results[] =
-                        $test_row;
-
-
-                    /* Final Level 2 pass */
-
-                    if (
-                        (int)$test_row["level"] === 2 &&
-                        (int)$test_row["passed"] === 1 &&
-                        (int)$test_row["score"] >= 4 &&
-                        (int)$test_row["total_questions"] === 5
-                    ) {
-
-                        $final_level2_passed = true;
-                    }
+                if ($status === "shortlisted") {
+                    $status_class = "shortlisted";
+                    $status_text = "Shortlisted";
+                } elseif ($status === "rejected") {
+                    $status_class = "rejected";
+                    $status_text = "Rejected";
+                } else {
+                    $status_class = "pending";
+                    $status_text = ucfirst($status ?: "pending");
                 }
 
+                $application_id = (int)$row["id"];
+                $test_sql = "
+                    SELECT id, level, score, total_questions, percentage, passed, created_at
+                    FROM test_results
+                    WHERE application_id = ?
+                    ORDER BY id DESC
+                ";
+                $test_stmt = mysqli_prepare($conn, $test_sql);
+                $test_results = [];
+                $final_level2_passed = false;
 
-                mysqli_stmt_close(
-                    $test_stmt
-                );
-            }
+                if ($test_stmt) {
+                    mysqli_stmt_bind_param($test_stmt, "i", $application_id);
+                    mysqli_stmt_execute($test_stmt);
+                    $test_result = mysqli_stmt_get_result($test_stmt);
 
-
-            $has_test =
-                count($test_results) > 0;
-
-
-            /* Latest test */
-
-            $latest_test =
-                $has_test
-                    ? $test_results[0]
-                    : null;
-
-            ?>
-
-
-            <!-- ==================================================
-                 APPLICATION CARD
-            ================================================== -->
-
-            <div class="application-card">
-
-
-                <h2>
-
-                    📋
-
-                    <?php
-                    echo htmlspecialchars(
-                        $row["title"]
-                    );
-                    ?>
-
-                </h2>
-
-
-                <p class="company">
-
-                    🏢
-
-                    <?php
-                    echo htmlspecialchars(
-                        $row["company_name"]
-                    );
-                    ?>
-
-                </p>
-
-
-                <p class="info">
-
-                    📍
-
-                    <strong>
-                        Location:
-                    </strong>
-
-                    <?php
-                    echo htmlspecialchars(
-                        $row["location"]
-                    );
-                    ?>
-
-                </p>
-
-
-                <p class="info">
-
-                    📅
-
-                    <strong>
-                        Applied On:
-                    </strong>
-
-                    <?php
-
-                    if (!empty($row["applied_at"])) {
-
-                        echo date(
-                            "d M Y",
-                            strtotime(
-                                $row["applied_at"]
-                            )
-                        );
-
-                    } else {
-
-                        echo "Not available";
-
+                    while ($test_row = mysqli_fetch_assoc($test_result)) {
+                        $test_results[] = $test_row;
+                        if (
+                            (int)$test_row["level"] === 2 &&
+                            (int)$test_row["passed"] === 1 &&
+                            (int)$test_row["score"] >= 4 &&
+                            (int)$test_row["total_questions"] === 5
+                        ) {
+                            $final_level2_passed = true;
+                        }
                     }
-
-                    ?>
-
-                </p>
-
-
-                <!-- ==================================================
-                     APPLICATION STATUS
-                ================================================== -->
-
-                <span
-                    class="status <?php echo $status_class; ?>"
-                >
-
-                    <?php if ($status === "shortlisted"): ?>
-
-                        ⭐
-
-                    <?php elseif ($status === "rejected"): ?>
-
-                        ❌
-
-                    <?php else: ?>
-
-                        ⏳
-
-                    <?php endif; ?>
-
-
-                    Status:
-
-                    <?php
-                    echo htmlspecialchars(
-                        $status_text
-                    );
-                    ?>
-
-                </span>
-
-
-                <!-- ==================================================
-                     MOCK TEST
-                ================================================== -->
-
-                <div class="mock-test-box">
-
-                    <h3>
-                        📝 Mock Test
-                    </h3>
-
-
-                    <?php if (!$has_test): ?>
-
-
-                        <div class="mock-status">
-
-                            <span class="mock-pending">
-                                ⏳ Not Attended Yet
-                            </span>
-
-                            <br>
-
-                            You have not attended the mock test
-                            for this internship.
-
-                        </div>
-
-
-                        <a
-                            href="mock_test.php?application_id=<?php echo $application_id; ?>"
-                            class="mock-btn"
-                        >
-                            📝 Attend Mock Test
-                        </a>
-
-
-                    <?php else: ?>
-
-
-                        <div class="mock-status">
-
-                            <strong>
-                                ✅ Mock Test Attended
-                            </strong>
-
-                        </div>
-
-
-                        <!-- LATEST RESULT -->
-
-                        <?php if ($latest_test): ?>
-
-
-                            <div class="mock-result">
-
-                                <p class="info">
-
-                                    <strong>
-                                        Latest Level:
-                                    </strong>
-
-                                    Level
-                                    <?php
-                                    echo (int)$latest_test["level"];
-                                    ?>
-
-                                </p>
-
-
-                                <p class="info">
-
-                                    <strong>
-                                        Score:
-                                    </strong>
-
-                                    <?php
-                                    echo (int)$latest_test["score"];
-                                    ?>
-
-                                    /
-
-                                    <?php
-                                    echo (int)$latest_test["total_questions"];
-                                    ?>
-
-                                </p>
-
-
-                                <p class="info">
-
-                                    <strong>
-                                        Percentage:
-                                    </strong>
-
-                                    <?php
-                                    echo (float)$latest_test["percentage"];
-                                    ?>%
-
-                                </p>
-
-
-                                <p class="info">
-
-                                    <strong>
-                                        Result:
-                                    </strong>
-
-
-                                    <?php if (
-                                        (int)$latest_test["passed"] === 1
-                                    ): ?>
-
-                                        <span class="mock-pass">
-                                            ✅ PASS
-                                        </span>
-
-                                    <?php else: ?>
-
-                                        <span class="mock-fail">
-                                            ❌ FAIL
-                                        </span>
-
-                                    <?php endif; ?>
-
-                                </p>
-
-
-                                <p class="info">
-
-                                    <strong>
-                                        Taken On:
-                                    </strong>
-
-                                    <?php
-                                    echo date(
-                                        "d M Y, h:i A",
-                                        strtotime(
-                                            $latest_test["created_at"]
-                                        )
-                                    );
-                                    ?>
-
-                                </p>
-
-                            </div>
-
-
-                        <?php endif; ?>
-
-
-                        <!-- FINAL LEVEL 2 PASSED -->
-
-                        <?php if ($final_level2_passed): ?>
-
-
-                            <div class="final-pass">
-
-                                ✅ Final Mock Test Passed
-
-                                <br><br>
-
-                                You have successfully completed
-                                the required mock test.
-
-                                <br><br>
-
-                                The company can now review
-                                your application.
-
-                            </div>
-
-
+                    mysqli_stmt_close($test_stmt);
+                }
+
+                $has_test = count($test_results) > 0;
+                $latest_test = $has_test ? $test_results[0] : null;
+            ?>
+                <tr>
+                    <td><?php echo $row_number++; ?></td>
+                    <td class="internship-title"><?php echo htmlspecialchars($row["title"] ?? "N/A"); ?></td>
+                    <td><?php echo htmlspecialchars($row["company_name"] ?? "N/A"); ?></td>
+                    <td><?php echo htmlspecialchars($row["location"] ?? "N/A"); ?></td>
+                    <td>
+                        <?php
+                        echo !empty($row["applied_at"])
+                            ? date("d M Y", strtotime($row["applied_at"]))
+                            : "Not available";
+                        ?>
+                    </td>
+                    <td><span class="status <?php echo htmlspecialchars($status_class); ?>"><?php echo htmlspecialchars($status_text); ?></span></td>
+                    <td class="mock-cell">
+                        <?php if (!$has_test): ?>
+                            <span class="mock-pending">Not attended</span>
                         <?php else: ?>
-
-
-                            <a
-                                href="mock_test.php?application_id=<?php echo $application_id; ?>"
-                                class="mock-btn"
-                            >
-                                📝 Continue Mock Test
-                            </a>
-
-
+                            <strong>Level <?php echo (int)$latest_test["level"]; ?></strong><br>
+                            Score: <?php echo (int)$latest_test["score"]; ?>/<?php echo (int)$latest_test["total_questions"]; ?><br>
+                            <?php echo (float)$latest_test["percentage"]; ?>% —
+                            <?php if ((int)$latest_test["passed"] === 1): ?>
+                                <span class="mock-pass">PASS</span>
+                            <?php else: ?>
+                                <span class="mock-fail">FAIL</span>
+                            <?php endif; ?>
+                            <?php if ($final_level2_passed): ?><br><span class="mock-pass">Final test passed</span><?php endif; ?>
+                        <?php endif; ?>
+                    </td>
+                    <td class="actions-cell">
+                        <?php if (!$has_test): ?>
+                            <a class="table-action mock-action" href="mock_test.php?application_id=<?php echo $application_id; ?>">Attend Test</a>
+                        <?php elseif (!$final_level2_passed): ?>
+                            <a class="table-action mock-action" href="mock_test.php?application_id=<?php echo $application_id; ?>">Continue Test</a>
+                        <?php else: ?>
+                            <span class="completed-label">Completed</span>
                         <?php endif; ?>
 
+                        <?php if ($status === "pending"): ?>
+                            <form method="POST" class="table-cancel-form" onsubmit="return confirm('Are you sure you want to cancel this application?');">
+                                <input type="hidden" name="application_id" value="<?php echo $application_id; ?>">
+                                <button type="submit" name="cancel_application" class="cancel-btn">Cancel</button>
+                            </form>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+            <?php endwhile; ?>
+            </tbody>
+        </table>
+    </div>
 
-                    <?php endif; ?>
+<?php else: ?>
 
+    <div class="empty">
+        <h2>No Active Applications</h2>
+        <p>You haven't applied for any internship yet.</p>
+        <a href="internships.php" class="browse-btn">Browse Internships</a>
+    </div>
 
-                </div>
-
-
-                <!-- ==================================================
-                     CANCEL ONLY FOR PENDING
-                ================================================== -->
-
-                <?php if ($status === "pending"): ?>
-
-                    <form
-                        method="POST"
-                        class="cancel-form"
-                        onsubmit="return confirm(
-                            'Are you sure you want to cancel this application?'
-                        );"
-                    >
-
-                        <input
-                            type="hidden"
-                            name="application_id"
-                            value="<?php
-                            echo $application_id;
-                            ?>"
-                        >
-
-
-                        <button
-                            type="submit"
-                            name="cancel_application"
-                            class="cancel-btn"
-                        >
-
-                            ✕ Cancel Application
-
-                        </button>
-
-                    </form>
-
-                <?php endif; ?>
-
-
-            </div>
-
-
-        <?php endwhile; ?>
-
-
-    <?php else: ?>
-
-
-        <!-- ==================================================
-             NO APPLICATIONS
-        ================================================== -->
-
-        <div class="empty">
-
-            <h2>
-                No Active Applications
-            </h2>
-
-            <p>
-                You haven't applied for any internship yet.
-            </p>
-
-            <a
-                href="internships.php"
-                class="browse-btn"
-            >
-
-                🔍 Browse Internships
-
-            </a>
-
-        </div>
-
-
-    <?php endif; ?>
-
-
-</div>
+<?php endif; ?></div>
 
 
 </body>

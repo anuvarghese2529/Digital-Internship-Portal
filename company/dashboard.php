@@ -829,9 +829,11 @@ body {
             📄 Applications
         </a>
 
-
-        
-
+        <a
+            href="suggestions.php"
+        >
+            💡 Internship Suggestions
+        </a>
 
         <a
             href="../logout.php"
@@ -1159,6 +1161,12 @@ body {
                 📄 View Applications
             </a>
 
+            <a
+                href="suggestions.php"
+                class="action-btn"
+            >
+                💡 Internship Suggestions
+            </a>
 
             <a
                 href="applications.php"

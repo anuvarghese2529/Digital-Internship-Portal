@@ -188,7 +188,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                     $resume_path =
                         __DIR__ .
-                        "/../assets/uploads/resumes/" .
+                        "/../assets/uploads/" .
                         $resume_name;
 
                     if (is_file($resume_path)) {
@@ -352,6 +352,28 @@ body{
     border-radius:7px;
 }
 
+.mock-tests{
+    margin-top:18px;
+    border:1px solid #e2e6f0;
+    border-radius:9px;
+    overflow:hidden;
+    background:#fbfcff;
+}
+.mock-tests summary{
+    cursor:pointer;
+    padding:14px 16px;
+    background:#eef2ff;
+    color:#4f46e5;
+    font-weight:bold;
+}
+.table-wrap{width:100%;overflow-x:auto;padding:12px;}
+table{width:100%;border-collapse:collapse;min-width:750px;background:white;}
+th,td{padding:11px 12px;border:1px solid #e5e7eb;text-align:left;font-size:13px;}
+th{background:#667eea;color:white;white-space:nowrap;}
+.pass{color:#198754;font-weight:bold;}
+.fail{color:#dc3545;font-weight:bold;}
+.no-tests{padding:16px;color:#777;}
+
 .no-data{
     background:white;
     padding:35px;
@@ -379,7 +401,7 @@ body{
 
     <p>
         All registered students are active automatically.
-        Admin can remove students from here.
+        Click Mock Tests under each student to view their scores, results, date/time and video on this same page. Admin can remove students from here.
     </p>
 
     <a href="dashboard.php"
@@ -410,8 +432,26 @@ body{
 
     <?php while($row = mysqli_fetch_assoc($result)): ?>
 
+        <?php
+        $student_test_sql = "
+            SELECT tr.id AS test_id, tr.level, tr.score, tr.total_questions,
+                   tr.percentage, tr.passed, tr.time_limit_seconds,
+                   tr.time_taken_seconds, tr.video_path, tr.created_at,
+                   i.title AS internship_title, i.company_name
+            FROM test_results tr
+            LEFT JOIN internships i ON tr.internship_id = i.id
+            WHERE tr.user_id = ?
+            ORDER BY tr.created_at DESC, tr.id DESC
+        ";
+        $student_test_stmt = mysqli_prepare($conn, $student_test_sql);
+        $student_id_for_tests = (int)$row["id"];
+        mysqli_stmt_bind_param($student_test_stmt, "i", $student_id_for_tests);
+        mysqli_stmt_execute($student_test_stmt);
+        $student_tests_result = mysqli_stmt_get_result($student_test_stmt);
+        $student_test_count = $student_tests_result ? mysqli_num_rows($student_tests_result) : 0;
+        ?>
 
-        <div class="student">
+        <div class="student" id="student-<?= (int)$row["id"] ?>">
 
             <h2>
                 <?= htmlspecialchars($row["name"]) ?>
@@ -443,11 +483,51 @@ body{
             </div>
 
 
+            <details class="mock-tests">
+                <summary>📝 Mock Tests (<?= (int)$student_test_count ?>)</summary>
+                <?php if($student_test_count > 0): ?>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr>
+                                <th>Date & Time</th><th>Internship / Company</th>
+                                <th>Level</th><th>Score</th><th>Result</th>
+                                <th>Time Taken</th><th>Video</th>
+                            </tr></thead>
+                            <tbody>
+                            <?php while($test = mysqli_fetch_assoc($student_tests_result)): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($test["created_at"] ?? "—") ?></td>
+                                    <td>
+                                        <?= htmlspecialchars($test["internship_title"] ?? "General Mock Test") ?>
+                                        <?php if(!empty($test["company_name"])): ?>
+                                            <br><small><?= htmlspecialchars($test["company_name"]) ?></small>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?= htmlspecialchars($test["level"] ?? "—") ?></td>
+                                    <td><?= (int)($test["score"] ?? 0) ?> / <?= (int)($test["total_questions"] ?? 0) ?> (<?= htmlspecialchars((string)($test["percentage"] ?? 0)) ?>%)</td>
+                                    <td class="<?= !empty($test["passed"]) ? 'pass' : 'fail' ?>"><?= !empty($test["passed"]) ? 'Passed' : 'Failed' ?></td>
+                                    <td><?php $taken = (int)($test["time_taken_seconds"] ?? 0); echo $taken > 0 ? floor($taken / 60) . "m " . ($taken % 60) . "s" : "—"; ?></td>
+                                    <td>
+                                        <?php if(!empty($test["video_path"])): ?>
+                                            <a href="../<?= htmlspecialchars(ltrim($test["video_path"], "/\\")) ?>" target="_blank" rel="noopener">View Video</a>
+                                        <?php else: ?>—<?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endwhile; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <p class="no-tests">This student has not attempted any mock tests.</p>
+                <?php endif; ?>
+            </details>
+            <?php if ($student_test_stmt) { mysqli_stmt_close($student_test_stmt); } ?>
+
             <?php if(!empty($row["resume"])): ?>
 
                 <a
                     class="resume"
-                    href="../assets/uploads/resumes/<?= htmlspecialchars(basename($row["resume"])) ?>"
+                    href="../assets/uploads/<?= rawurlencode(basename($row["resume"])) ?>"
                     target="_blank"
                 >
                     📄 View Resume

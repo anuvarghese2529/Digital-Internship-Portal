@@ -1126,6 +1126,54 @@ body {
 
 }
 
+
+
+/* APPLICATIONS TABLE */
+.table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 5px 18px rgba(0,0,0,0.08);
+    margin-bottom: 25px;
+}
+.applications-table {
+    width: 100%;
+    min-width: 1250px;
+    border-collapse: collapse;
+    background: #fff;
+}
+.applications-table th,
+.applications-table td {
+    padding: 14px 12px;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid #e8eaf0;
+    line-height: 1.55;
+}
+.applications-table th {
+    background: #667eea;
+    color: #fff;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+.applications-table tbody tr:hover { background: #f8f9ff; }
+.date-cell { min-width: 135px; white-space: nowrap; }
+.muted { color: #777; font-size: 12px; overflow-wrap: anywhere; }
+.match-cell { min-width: 110px; }
+.match-cell .progress { margin-top: 8px; min-width: 80px; height: 12px; }
+.match-cell .progress-bar { height: 12px; line-height: 12px; }
+.test-cell { min-width: 220px; }
+.more-details { margin-top: 8px; font-size: 13px; }
+.more-details summary { cursor: pointer; color: #5265d4; font-weight: bold; }
+.more-details p { margin-top: 8px; overflow-wrap: anywhere; }
+.history-item { border-top: 1px solid #eee; padding: 9px 0; font-size: 12px; }
+.applications-table .status { display: inline-block; white-space: nowrap; }
+.applications-table .resume-btn { margin: 2px 0; }
+.applications-table .delete-btn { white-space: nowrap; }
+
 </style>
 
 </head>
@@ -1148,8 +1196,7 @@ body {
         </h1>
 
         <p>
-            View all student applications,
-            resumes, skill matching and mock test performance.
+            Applications are sorted by the latest applied date and time. View student details, resumes, skill matching and mock test performance in table format.
         </p>
 
         <a
@@ -1206,188 +1253,83 @@ body {
     <?php endif; ?>
 
 
+    <?php if (mysqli_num_rows($result) > 0): ?>
+
+    <div class="table-wrap">
+        <table class="applications-table">
+            <thead>
+                <tr>
+                    <th>Applied Date &amp; Time</th>
+                    <th>Student Details</th>
+                    <th>Internship / Company</th>
+                    <th>Status</th>
+                    <th>Skill Match</th>
+                    <th>Mock Test</th>
+                    <th>Resume</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+
     <?php while ($row = mysqli_fetch_assoc($result)): ?>
-
-
         <?php
+        $application_id = (int)$row["application_id"];
+        $student_id = (int)$row["student_id"];
+        $internship_id = (int)$row["internship_id"];
 
-        $application_id =
-            (int)$row["application_id"];
-
-        $student_id =
-            (int)$row["student_id"];
-
-        $internship_id =
-            (int)$row["internship_id"];
-
-
-        /* ==========================================
-           STATUS CLASS
-        ========================================== */
-
-        $status_class =
-            "status-pending";
-
-        if (
-            $row["application_status"]
-            === "Shortlisted"
-        ) {
-
-            $status_class =
-                "status-shortlisted";
+        $status_class = "status-pending";
+        if ($row["application_status"] === "Shortlisted") {
+            $status_class = "status-shortlisted";
+        } elseif ($row["application_status"] === "Rejected") {
+            $status_class = "status-rejected";
         }
 
-        if (
-            $row["application_status"]
-            === "Rejected"
-        ) {
+        $skill_match = calculateSkillMatch(
+            $row["student_skills"] ?? "",
+            $row["internship_skills"] ?? ""
+        );
 
-            $status_class =
-                "status-rejected";
+        $resume_file = !empty($row["resume"])
+            ? basename($row["resume"])
+            : "";
+        $resume_url = "";
+        $resume_server_path = "";
+        if ($resume_file !== "") {
+            $resume_url = "../assets/uploads/" . rawurlencode($resume_file);
+            $resume_server_path = __DIR__ . "/../assets/uploads/" . $resume_file;
         }
-
-
-        /* ==========================================
-           SKILL MATCH
-        ========================================== */
-
-        $skill_match =
-            calculateSkillMatch(
-                $row["student_skills"] ?? "",
-                $row["internship_skills"] ?? ""
-            );
-
-
-        /* ==========================================
-           RESUME FILE
-        ========================================== */
-
-        $resume_file = "";
-
-        if (
-            !empty($row["resume"])
-        ) {
-
-            /*
-             * basename() is important.
-             *
-             * If database contains:
-             * resumes/resume_18_xxx.pdf
-             *
-             * it becomes:
-             * resume_18_xxx.pdf
-             *
-             * Therefore the wrong /resumes/
-             * folder will NOT appear.
-             */
-
-            $resume_file =
-                basename(
-                    $row["resume"]
-                );
-        }
-
-
-        /* ==========================================
-           TEST RESULTS
-        ========================================== */
 
         $test_results = [];
-
         $level1_attempts = 0;
-
         $final_level2_passed = false;
-
         $final_level2_score = 0;
-
         $last_level = 0;
-
         $last_score = 0;
-
         $last_percentage = 0;
 
-
         $test_sql = "
-            SELECT
-                id,
-                level,
-                score,
-                total_questions,
-                percentage,
-                passed,
-                time_limit_seconds,
-                time_taken_seconds,
-                video_path,
-                created_at
-
+            SELECT id, level, score, total_questions, percentage, passed,
+                   time_limit_seconds, time_taken_seconds, video_path, created_at
             FROM test_results
-
             WHERE application_id = ?
-
-            ORDER BY
-                created_at ASC,
-                id ASC
+            ORDER BY created_at ASC, id ASC
         ";
-
-
-        $test_stmt =
-            mysqli_prepare(
-                $conn,
-                $test_sql
-            );
-
+        $test_stmt = mysqli_prepare($conn, $test_sql);
 
         if ($test_stmt) {
+            mysqli_stmt_bind_param($test_stmt, "i", $application_id);
+            mysqli_stmt_execute($test_stmt);
+            $test_result = mysqli_stmt_get_result($test_stmt);
 
-            mysqli_stmt_bind_param(
-                $test_stmt,
-                "i",
-                $application_id
-            );
+            while ($test = mysqli_fetch_assoc($test_result)) {
+                $test_results[] = $test;
+                $last_level = (int)$test["level"];
+                $last_score = (int)$test["score"];
+                $last_percentage = (float)$test["percentage"];
 
-            mysqli_stmt_execute(
-                $test_stmt
-            );
-
-            $test_result =
-                mysqli_stmt_get_result(
-                    $test_stmt
-                );
-
-
-            while (
-                $test =
-                mysqli_fetch_assoc(
-                    $test_result
-                )
-            ) {
-
-                $test_results[] =
-                    $test;
-
-
-                $last_level =
-                    (int)$test["level"];
-
-                $last_score =
-                    (int)$test["score"];
-
-                $last_percentage =
-                    (float)$test["percentage"];
-
-
-                if (
-                    (int)$test["level"] === 1
-                ) {
-
+                if ((int)$test["level"] === 1) {
                     $level1_attempts++;
                 }
-
-
-                /*
-                 * FINAL LEVEL 2 PASS
-                 * Minimum 4/5
-                 */
 
                 if (
                     (int)$test["level"] === 2 &&
@@ -1395,822 +1337,112 @@ body {
                     (int)$test["score"] >= 4 &&
                     (int)$test["total_questions"] === 5
                 ) {
-
-                    $final_level2_passed =
-                        true;
-
-                    $final_level2_score =
-                        (int)$test["score"];
+                    $final_level2_passed = true;
+                    $final_level2_score = (int)$test["score"];
                 }
-
             }
-
-
-            mysqli_stmt_close(
-                $test_stmt
-            );
+            mysqli_stmt_close($test_stmt);
         }
 
-
-        $has_test =
-            count($test_results) > 0;
-
-
-        $max_attempts_reached =
-            $level1_attempts >= 5 &&
-            !$final_level2_passed;
-
+        $has_test = count($test_results) > 0;
+        $max_attempts_reached = $level1_attempts >= 5 && !$final_level2_passed;
         ?>
 
-
-        <!-- ==================================================
-             APPLICATION CARD
-        ================================================== -->
-
-        <div class="application-card">
-
-
-            <!-- HEADER -->
-
-            <div class="application-header">
-
-                <div>
-
-                    <h2>
-                        <?= htmlspecialchars(
-                            $row["student_name"]
-                        ) ?>
-                    </h2>
-
-                    <p>
-                        Internship:
-                        <strong>
-                            <?= htmlspecialchars(
-                                $row["internship_title"]
-                            ) ?>
-                        </strong>
-                    </p>
-
-                    <p style="margin-top:5px;">
-                        Company:
-                        <strong>
-                            <?= htmlspecialchars(
-                                $row["company_name"]
-                            ) ?>
-                        </strong>
-                    </p>
-
-                </div>
-
-
-                <span
-                    class="status <?= $status_class ?>"
-                >
-                    <?= htmlspecialchars(
-                        $row["application_status"]
-                    ) ?>
-                </span>
-
-            </div>
-
-
-            <!-- ==================================================
-                 STUDENT DETAILS
-            ================================================== -->
-
-            <div class="info-grid">
-
-
-                <div class="info-box">
-
-                    <strong>
-                        👤 Student
-                    </strong>
-
-                    <?= htmlspecialchars(
-                        $row["student_name"]
-                    ) ?>
-
-                </div>
-
-
-                <div class="info-box">
-
-                    <strong>
-                        📧 Email
-                    </strong>
-
-                    <?= htmlspecialchars(
-                        $row["student_email"]
-                    ) ?>
-
-                </div>
-
-
-                <div class="info-box">
-
-                    <strong>
-                        🎓 Education
-                    </strong>
-
-                    <?= !empty(
-                        $row["education"]
-                    )
-
-                        ? htmlspecialchars(
-                            $row["education"]
-                        )
-
-                        : "Not provided"
-                    ?>
-
-                </div>
-
-
-                <div class="info-box">
-
-                    <strong>
-                        📅 Applied On
-                    </strong>
-
-                    <?= date(
-                        "d-m-Y h:i A",
-                        strtotime(
-                            $row["applied_at"]
-                        )
-                    ) ?>
-
-                </div>
-
-
-                <div class="info-box">
-
-                    <strong>
-                        🆔 Application ID
-                    </strong>
-
-                    #<?= $application_id ?>
-
-                </div>
-
-
-                <div class="info-box">
-
-                    <strong>
-                        🏢 Internship ID
-                    </strong>
-
-                    #<?= $internship_id ?>
-
-                </div>
-
-
-            </div>
-
-
-            <!-- ==================================================
-                 STUDENT SKILLS
-            ================================================== -->
-
-            <div class="skill-box">
-
-                <strong>
-                    💻 Student Skills
-                </strong>
-
-                <br>
-
-                <?= !empty(
-                    $row["student_skills"]
-                )
-
-                    ? nl2br(
-                        htmlspecialchars(
-                            $row["student_skills"]
-                        )
-                    )
-
-                    : "No skills provided"
-                ?>
-
-            </div>
-
-
-            <!-- ==================================================
-                 REQUIRED SKILLS
-            ================================================== -->
-
-            <div class="skill-box">
-
-                <strong>
-                    🎯 Required Internship Skills
-                </strong>
-
-                <br>
-
-                <?= !empty(
-                    $row["internship_skills"]
-                )
-
-                    ? nl2br(
-                        htmlspecialchars(
-                            $row["internship_skills"]
-                        )
-                    )
-
-                    : "No specific skills provided"
-                ?>
-
-            </div>
-
-
-            <!-- ==================================================
-                 SKILL MATCH
-            ================================================== -->
-
-            <div class="skill-match">
-
-                <div class="skill-match-title">
-
-                    🎯 Skill Match:
-                    <?= $skill_match ?>%
-
-                </div>
-
-
-                <div class="progress">
-
-                    <div
-                        class="progress-bar"
-                        style="
-                            width:<?= $skill_match ?>%;
-                        "
-                    >
-
-                        <?= $skill_match ?>%
-
-                    </div>
-
-                </div>
-
-            </div>
-
-
-            <!-- ==================================================
-                 RESUME
-            ================================================== -->
-
-            <div class="resume-section">
-
-                <div class="resume-title">
-                    📄 Resume
-                </div>
-
-
-                <?php if (!empty($resume_file)): ?>
-
-
-                    <?php
-
-                    /*
-                     * CORRECT ADMIN PATH
-                     *
-                     * admin/applications.php
-                     *        ↓
-                     * ../assets/uploads/
-                     *
-                     * basename() prevents:
-                     * assets/uploads/resumes/file.pdf
-                     *
-                     * and creates:
-                     * assets/uploads/file.pdf
-                     */
-
-                    $resume_url =
-                        "../assets/uploads/" .
-                        rawurlencode(
-                            $resume_file
-                        );
-
-                    $resume_server_path =
-                        __DIR__ .
-                        "/../assets/uploads/" .
-                        $resume_file;
-
-                    ?>
-
-
-                    <?php if (
-                        file_exists(
-                            $resume_server_path
-                        )
-                    ): ?>
-
-
-                        <a
-                            href="<?= htmlspecialchars(
-                                $resume_url
-                            ) ?>"
-                            target="_blank"
-                            rel="noopener"
-                            class="resume-btn"
-                        >
-                            👁 View Resume
-                        </a>
-
-
-                        <a
-                            href="<?= htmlspecialchars(
-                                $resume_url
-                            ) ?>"
-                            download
-                            class="resume-btn"
-                        >
-                            ⬇ Download Resume
-                        </a>
-
-
-                    <?php else: ?>
-
-
-                        <span class="no-resume">
-
-                            ⚠ Resume record exists,
-                            but file was not found in
-                            <strong>
-                                assets/uploads
-                            </strong>.
-
-                        </span>
-
-
-                    <?php endif; ?>
-
-
-                <?php else: ?>
-
-
-                    <span class="no-resume">
-
-                        No resume uploaded.
-
-                    </span>
-
-
-                <?php endif; ?>
-
-            </div>
-
-
-            <!-- ==================================================
-                 MOCK TEST
-            ================================================== -->
-
-            <div class="test-section">
-
-                <h3>
-                    📝 Mock Test Performance
-                </h3>
-
-
-                <div class="test-summary">
-
-
-                    <div class="test-box">
-
-                        Total L1 Attempts
-
-                        <strong>
-                            <?= $level1_attempts ?> / 5
-                        </strong>
-
-                    </div>
-
-
-                    <div class="test-box">
-
-                        Last Level
-
-                        <strong>
-
-                            <?= $has_test
-
-                                ? "Level " .
-                                  $last_level
-
-                                : "-"
-                            ?>
-
-                        </strong>
-
-                    </div>
-
-
-                    <div class="test-box">
-
-                        Last Score
-
-                        <strong>
-
-                            <?= $has_test
-
-                                ? $last_score .
-                                  "/" .
-                                  ($test_results[
-                                      count($test_results)-1
-                                  ]["total_questions"])
-
-                                : "-"
-                            ?>
-
-                        </strong>
-
-                    </div>
-
-
-                    <div class="test-box">
-
-                        Last Percentage
-
-                        <strong>
-
-                            <?= $has_test
-
-                                ? $last_percentage .
-                                  "%"
-
-                                : "-"
-                            ?>
-
-                        </strong>
-
-                    </div>
-
-
-                </div>
-
-
+        <tr>
+            <td class="date-cell">
+                <strong><?= date("d-m-Y", strtotime($row["applied_at"])) ?></strong><br>
+                <span><?= date("h:i:s A", strtotime($row["applied_at"])) ?></span>
+            </td>
+
+            <td>
+                <strong><?= htmlspecialchars($row["student_name"]) ?></strong><br>
+                <span class="muted"><?= htmlspecialchars($row["student_email"]) ?></span><br>
+                <span class="muted">Application ID: #<?= $application_id ?></span><br>
+                <span class="muted">Education: <?= htmlspecialchars($row["education"] ?: "Not provided") ?></span>
+                <details class="more-details">
+                    <summary>View skills</summary>
+                    <p><strong>Student skills:</strong><br><?= !empty($row["student_skills"]) ? nl2br(htmlspecialchars($row["student_skills"])) : "No skills provided" ?></p>
+                    <p><strong>Required skills:</strong><br><?= !empty($row["internship_skills"]) ? nl2br(htmlspecialchars($row["internship_skills"])) : "No specific skills provided" ?></p>
+                </details>
+            </td>
+
+            <td>
+                <strong><?= htmlspecialchars($row["internship_title"]) ?></strong><br>
+                <span class="muted"><?= htmlspecialchars($row["company_name"]) ?></span><br>
+                <span class="muted">Internship ID: #<?= $internship_id ?></span>
+            </td>
+
+            <td><span class="status <?= $status_class ?>"><?= htmlspecialchars($row["application_status"]) ?></span></td>
+
+            <td class="match-cell">
+                <strong><?= $skill_match ?>%</strong>
+                <div class="progress"><div class="progress-bar" style="width:<?= $skill_match ?>%"></div></div>
+            </td>
+
+            <td class="test-cell">
                 <?php if (!$has_test): ?>
-
-
-                    <div class="test-pending">
-
-                        ⏳ Student has not attended
-                        the mock test yet.
-
-                    </div>
-
-
+                    <span class="muted">Not attended</span>
                 <?php else: ?>
-
-
-                    <strong>
-                        Test History
-                    </strong>
-
-                    <br><br>
-
-
-                    <?php
-
-                    $attempt_number = 0;
-
-                    ?>
-
-
-                    <?php foreach (
-                        $test_results
-                        as $test
-                    ): ?>
-
-
-                        <?php
-
-                        if (
-                            (int)$test["level"] === 1
-                        ) {
-
-                            $attempt_number++;
-                        }
-
-                        ?>
-
-
-                        <div
-                            class="test-result-row"
-                        >
-
-
-                            <strong>
-
-                                <?php if (
-                                    (int)$test["level"] === 1
-                                ): ?>
-
-                                    L1 -
-                                    Attempt
-                                    <?= $attempt_number ?>
-
-                                <?php else: ?>
-
-                                    L2 -
-                                    Final Level
-
-                                <?php endif; ?>
-
-                            </strong>
-
-
-                            <div class="test-line">
-
-                                Score:
-
-                                <strong>
-                                    <?= (int)$test["score"] ?>
-                                </strong>
-
-                                /
-
-                                <?= (int)$test[
-                                    "total_questions"
-                                ] ?>
-
-                                &nbsp; | &nbsp;
-
-                                Percentage:
-
-                                <strong>
-                                    <?= (float)$test[
-                                        "percentage"
-                                    ] ?>%
-                                </strong>
-
-                                &nbsp; | &nbsp;
-
-                                Result:
-
-                                <?php if (
-                                    (int)$test["passed"] === 1
-                                ): ?>
-
-                                    <span class="pass">
-                                        PASS
-                                    </span>
-
-                                <?php else: ?>
-
-                                    <span class="fail">
-                                        FAIL
-                                    </span>
-
-                                <?php endif; ?>
-
-                            </div>
-
-
-                            <div class="test-line">
-
-                                <strong>
-                                    Time Limit:
-                                </strong>
-
-                                <?= htmlspecialchars(
-                                    formatTestTime(
-                                        $test[
-                                            "time_limit_seconds"
-                                        ]
-                                    )
-                                ) ?>
-
-                                &nbsp;&nbsp;
-
-                                <strong>
-                                    Time Taken:
-                                </strong>
-
-                                <?= htmlspecialchars(
-                                    formatTestTime(
-                                        $test[
-                                            "time_taken_seconds"
-                                        ]
-                                    )
-                                ) ?>
-
-                            </div>
-
-
-                            <div class="test-line">
-
-                                <small>
-
-                                    Taken On:
-
-                                    <?= date(
-                                        "d-m-Y h:i A",
-                                        strtotime(
-                                            $test[
-                                                "created_at"
-                                            ]
-                                        )
-                                    ) ?>
-
-                                </small>
-
-                            </div>
-
-
-                            <?php if (
-                                !empty(
-                                    $test["video_path"]
-                                )
-                            ): ?>
-
-
-                                <?php
-
-                                $video_path =
-                                    $test[
-                                        "video_path"
-                                    ];
-
-                                /*
-                                 * If database already contains:
-                                 * assets/uploads/videos/file.webm
-                                 *
-                                 * then admin page needs:
-                                 * ../assets/uploads/videos/file.webm
-                                 */
-
-                                if (
-                                    strpos(
-                                        $video_path,
-                                        "http://"
-                                    ) === 0 ||
-
-                                    strpos(
-                                        $video_path,
-                                        "https://"
-                                    ) === 0
-                                ) {
-
-                                    $video_url =
-                                        $video_path;
-
-                                } else {
-
-                                    $video_url =
-                                        "../" .
-                                        ltrim(
-                                            $video_path,
-                                            "/"
-                                        );
-                                }
-
-                                ?>
-
-
-                                <div
-                                    class="test-line"
-                                >
-
-                                    <a
-                                        href="<?= htmlspecialchars(
-                                            $video_url
-                                        ) ?>"
-                                        target="_blank"
-                                        class="video-btn"
-                                    >
-                                        🎥 View Test Video
-                                    </a>
-
-                                </div>
-
-
-                            <?php endif; ?>
-
-
-                        </div>
-
-
-                    <?php endforeach; ?>
-
-
-                    <?php if (
-                        $final_level2_passed
-                    ): ?>
-
-
-                        <div class="final-pass">
-
-                            ✅ Final Mock Test Passed
-
-                            <br><br>
-
-                            Level 2 Score:
-
-                            <strong>
-                                <?= $final_level2_score ?>
-                                / 5
-                            </strong>
-
-                            <br>
-
-                            Required:
-
-                            <strong>
-                                4 / 5
-                            </strong>
-
-                            or above
-
-                        </div>
-
-
-                    <?php elseif (
-                        $max_attempts_reached
-                    ): ?>
-
-
-                        <div class="test-locked">
-
-                            🔒 Maximum 5 Level 1
-                            attempts completed.
-
-                            <br><br>
-
-                            Final mock test was not
-                            successfully completed.
-
-                        </div>
-
-
-                    <?php else: ?>
-
-
-                        <div class="test-pending">
-
-                            ⏳ Mock test is still
-                            in progress.
-
-                            <br><br>
-
-                            Level 1 requires
-                            <strong>8 / 10</strong>.
-
-                            <br>
-
-                            Level 2 requires
-                            <strong>4 / 5</strong>.
-
-                        </div>
-
-
+                    <strong>Last score: <?= $last_score ?>/<?= (int)$test_results[count($test_results) - 1]["total_questions"] ?></strong><br>
+                    <span><?= htmlspecialchars((string)$last_percentage) ?>% (Level <?= $last_level ?>)</span><br>
+                    <span class="muted">L1 attempts: <?= $level1_attempts ?>/5</span>
+                    <?php if ($final_level2_passed): ?>
+                        <p class="pass">Final test passed (<?= $final_level2_score ?>/5)</p>
+                    <?php elseif ($max_attempts_reached): ?>
+                        <p class="fail">Attempts completed</p>
                     <?php endif; ?>
 
-
+                    <details class="more-details">
+                        <summary>Test history (<?= count($test_results) ?>)</summary>
+                        <?php $attempt_number = 0; ?>
+                        <?php foreach ($test_results as $test): ?>
+                            <?php if ((int)$test["level"] === 1) { $attempt_number++; } ?>
+                            <div class="history-item">
+                                <strong><?= (int)$test["level"] === 1 ? "L1 Attempt " . $attempt_number : "L2 Final Level" ?></strong><br>
+                                Score: <?= (int)$test["score"] ?>/<?= (int)$test["total_questions"] ?> |
+                                <?= (float)$test["percentage"] ?>% |
+                                <span class="<?= (int)$test["passed"] === 1 ? "pass" : "fail" ?>"><?= (int)$test["passed"] === 1 ? "PASS" : "FAIL" ?></span><br>
+                                Time limit: <?= htmlspecialchars(formatTestTime($test["time_limit_seconds"])) ?> |
+                                Time taken: <?= htmlspecialchars(formatTestTime($test["time_taken_seconds"])) ?><br>
+                                <span class="muted">Taken: <?= date("d-m-Y h:i:s A", strtotime($test["created_at"])) ?></span>
+                                <?php if (!empty($test["video_path"])): ?>
+                                    <?php
+                                    $video_path = $test["video_path"];
+                                    $video_url = (strpos($video_path, "http://") === 0 || strpos($video_path, "https://") === 0)
+                                        ? $video_path
+                                        : "../" . ltrim($video_path, "/");
+                                    ?>
+                                    <br><a class="video-btn" href="<?= htmlspecialchars($video_url) ?>" target="_blank" rel="noopener">View Test Video</a>
+                                <?php endif; ?>
+                            </div>
+                        <?php endforeach; ?>
+                    </details>
                 <?php endif; ?>
+            </td>
 
-            </div>
+            <td>
+                <?php if ($resume_file !== "" && file_exists($resume_server_path)): ?>
+                    <a class="resume-btn" href="<?= htmlspecialchars($resume_url) ?>" target="_blank" rel="noopener">View</a>
+                    <a class="resume-btn" href="<?= htmlspecialchars($resume_url) ?>" download>Download</a>
+                <?php elseif ($resume_file !== ""): ?>
+                    <span class="muted">File not found</span>
+                <?php else: ?>
+                    <span class="muted">No resume</span>
+                <?php endif; ?>
+            </td>
 
-
-            <!-- ==================================================
-                 DELETE APPLICATION
-            ================================================== -->
-
-            <div class="bottom-section">
-
-                <form
-                    method="POST"
-                    onsubmit="
-                        return confirm(
-                            'Are you sure you want to delete this application? Test results and interview letter will also be deleted.'
-                        );
-                    "
-                >
-
-                    <input
-                        type="hidden"
-                        name="delete_application_id"
-                        value="<?= $application_id ?>"
-                    >
-
-
-                    <button
-                        type="submit"
-                        class="delete-btn"
-                    >
-                        🗑 Delete Application
-                    </button>
-
+            <td>
+                <form method="POST" onsubmit="return confirm('Are you sure you want to delete this application? Test results and interview letter will also be deleted.');">
+                    <input type="hidden" name="delete_application_id" value="<?= $application_id ?>">
+                    <button type="submit" class="delete-btn">Delete</button>
                 </form>
-
-            </div>
-
-
-        </div>
-
-
+            </td>
+        </tr>
     <?php endwhile; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php endif; ?>
 
 
 </div>

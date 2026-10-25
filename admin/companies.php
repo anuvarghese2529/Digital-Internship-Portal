@@ -21,87 +21,82 @@ if (($_SESSION['user_role'] ?? '') !== 'admin') {
 
 
 /* =========================================================
-   HELPER
+   ACTION
    ========================================================= */
 
-function tableExists(mysqli $conn, string $table): bool
-{
-    $table = mysqli_real_escape_string($conn, $table);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    $result = mysqli_query(
+    $action = $_POST['action'] ?? '';
+    $id     = (int)($_POST['id'] ?? 0);
+
+
+    if ($id <= 0) {
+        header("Location: company_verification.php");
+        exit();
+    }
+
+
+    /* =====================================================
+       GET CURRENT STATUS
+       ===================================================== */
+
+    $current_status = '';
+
+    $stmt = mysqli_prepare(
         $conn,
-        "SHOW TABLES LIKE '$table'"
+        "SELECT admin_status
+         FROM company_verifications
+         WHERE id = ?"
     );
 
-    return ($result && mysqli_num_rows($result) > 0);
-}
+    if ($stmt) {
+
+        mysqli_stmt_bind_param(
+            $stmt,
+            "i",
+            $id
+        );
+
+        mysqli_stmt_execute($stmt);
+
+        mysqli_stmt_bind_result(
+            $stmt,
+            $current_status
+        );
+
+        mysqli_stmt_fetch($stmt);
+
+        mysqli_stmt_close($stmt);
+    }
 
 
-/* =========================================================
-   APPROVE / REJECT
-   ========================================================= */
-
-if (
-    isset($_GET['action']) &&
-    isset($_GET['id'])
-) {
-
-    $action = $_GET['action'];
-    $user_id = (int)$_GET['id'];
-
-
-    /* =========================
-       APPROVE COMPANY
-       ========================= */
+    /* =====================================================
+       APPROVE
+       ===================================================== */
 
     if ($action === 'approve') {
 
-        $stmt = mysqli_prepare(
-            $conn,
-            "UPDATE company_verifications
-             SET admin_status = 'Approved',
-                 reviewed_at = NOW()
-             WHERE user_id = ?
-             AND admin_status = 'Pending'"
-        );
+        /*
+         * Approve ONLY if currently Pending
+         */
 
-        if ($stmt) {
-
-            mysqli_stmt_bind_param(
-                $stmt,
-                "i",
-                $user_id
-            );
-
-            mysqli_stmt_execute($stmt);
-
-            mysqli_stmt_close($stmt);
-        }
-
-
-        /* Notification */
-
-        if (tableExists($conn, 'notifications')) {
-
-            $message = "Your company verification has been approved by the administrator.";
-
-            $link = "../company/dashboard.php";
+        if ($current_status === 'Pending') {
 
             $stmt = mysqli_prepare(
                 $conn,
-                "INSERT INTO notifications
-                (user_id, message, link)
-                VALUES (?, ?, ?)"
+                "UPDATE company_verifications
+                 SET admin_status = 'Approved',
+                     reviewed_at = NOW()
+                 WHERE id = ?
+                 AND admin_status = 'Pending'"
             );
 
             if ($stmt) {
 
                 mysqli_stmt_bind_param(
                     $stmt,
-                    "iss",
-                    $user_id,
-                    $message,
-                    $link
+                    "i",
+                    $id
                 );
 
                 mysqli_stmt_execute($stmt);
@@ -112,58 +107,33 @@ if (
     }
 
 
-    /* =========================
-       REJECT COMPANY
-       ========================= */
+    /* =====================================================
+       REJECT
+       ===================================================== */
 
     elseif ($action === 'reject') {
 
-        $stmt = mysqli_prepare(
-            $conn,
-            "UPDATE company_verifications
-             SET admin_status = 'Rejected',
-                 reviewed_at = NOW()
-             WHERE user_id = ?
-             AND admin_status = 'Pending'"
-        );
+        /*
+         * Reject ONLY if currently Pending
+         */
 
-        if ($stmt) {
-
-            mysqli_stmt_bind_param(
-                $stmt,
-                "i",
-                $user_id
-            );
-
-            mysqli_stmt_execute($stmt);
-
-            mysqli_stmt_close($stmt);
-        }
-
-
-        /* Notification */
-
-        if (tableExists($conn, 'notifications')) {
-
-            $message = "Your company verification has been rejected by the administrator.";
-
-            $link = "../company/dashboard.php";
+        if ($current_status === 'Pending') {
 
             $stmt = mysqli_prepare(
                 $conn,
-                "INSERT INTO notifications
-                (user_id, message, link)
-                VALUES (?, ?, ?)"
+                "UPDATE company_verifications
+                 SET admin_status = 'Rejected',
+                     reviewed_at = NOW()
+                 WHERE id = ?
+                 AND admin_status = 'Pending'"
             );
 
             if ($stmt) {
 
                 mysqli_stmt_bind_param(
                     $stmt,
-                    "iss",
-                    $user_id,
-                    $message,
-                    $link
+                    "i",
+                    $id
                 );
 
                 mysqli_stmt_execute($stmt);
@@ -174,49 +144,53 @@ if (
     }
 
 
-    /* =========================
-       REMOVE COMPANY
-       ONLY APPROVED COMPANY
-       ========================= */
+    /* =====================================================
+       REMOVE
+       ===================================================== */
 
     elseif ($action === 'remove') {
 
-        $status = null;
+        /*
+         * Remove ONLY Approved company
+         */
 
+        if ($current_status === 'Approved') {
 
-        $stmt = mysqli_prepare(
-            $conn,
-            "SELECT admin_status
-             FROM company_verifications
-             WHERE user_id = ?"
-        );
+            /* Get company user id */
 
-        if ($stmt) {
+            $company_user_id = 0;
 
-            mysqli_stmt_bind_param(
-                $stmt,
-                "i",
-                $user_id
+            $stmt = mysqli_prepare(
+                $conn,
+                "SELECT user_id
+                 FROM company_verifications
+                 WHERE id = ?"
             );
 
-            mysqli_stmt_execute($stmt);
+            if ($stmt) {
 
-            mysqli_stmt_bind_result(
-                $stmt,
-                $status
-            );
+                mysqli_stmt_bind_param(
+                    $stmt,
+                    "i",
+                    $id
+                );
 
-            mysqli_stmt_fetch($stmt);
+                mysqli_stmt_execute($stmt);
 
-            mysqli_stmt_close($stmt);
-        }
+                mysqli_stmt_bind_result(
+                    $stmt,
+                    $company_user_id
+                );
+
+                mysqli_stmt_fetch($stmt);
+
+                mysqli_stmt_close($stmt);
+            }
 
 
-        /* Remove ONLY approved company */
-
-        if ($status === 'Approved') {
-
-            /* Get internships */
+            /* =================================================
+               GET COMPANY INTERNSHIPS
+               ================================================= */
 
             $internship_ids = [];
 
@@ -232,7 +206,7 @@ if (
                 mysqli_stmt_bind_param(
                     $stmt,
                     "i",
-                    $user_id
+                    $company_user_id
                 );
 
                 mysqli_stmt_execute($stmt);
@@ -240,139 +214,116 @@ if (
                 $result = mysqli_stmt_get_result($stmt);
 
                 while ($row = mysqli_fetch_assoc($result)) {
-                    $internship_ids[] = (int)$row['id'];
+
+                    $internship_ids[] =
+                        (int)$row['id'];
                 }
 
                 mysqli_stmt_close($stmt);
             }
 
 
-            /* Delete internship related data */
+            /* =================================================
+               DELETE RELATED DATA
+               ================================================= */
 
             foreach ($internship_ids as $internship_id) {
 
-                /* Applications */
+                mysqli_query(
+                    $conn,
+                    "DELETE FROM applications
+                     WHERE internship_id = $internship_id"
+                );
 
-                if (tableExists($conn, 'applications')) {
-
-                    mysqli_query(
-                        $conn,
-                        "DELETE FROM applications
-                         WHERE internship_id = $internship_id"
-                    );
-                }
-
-
-                /* Test results */
-
-                if (tableExists($conn, 'test_results')) {
-
-                    mysqli_query(
-                        $conn,
-                        "DELETE FROM test_results
-                         WHERE internship_id = $internship_id"
-                    );
-                }
-
-
-                /* Interview letters */
-
-                if (tableExists($conn, 'interview_letters')) {
-
-                    mysqli_query(
-                        $conn,
-                        "DELETE FROM interview_letters
-                         WHERE internship_id = $internship_id"
-                    );
-                }
-
-
-                /* Questions */
-
-                if (tableExists($conn, 'questions')) {
-
-                    mysqli_query(
-                        $conn,
-                        "DELETE FROM questions
-                         WHERE internship_id = $internship_id"
-                    );
-                }
-
-
-                /* Internship */
 
                 mysqli_query(
                     $conn,
-                    "DELETE FROM internships
-                     WHERE id = $internship_id"
+                    "DELETE FROM test_results
+                     WHERE internship_id = $internship_id"
+                );
+
+
+                if (
+                    mysqli_query(
+                        $conn,
+                        "SHOW TABLES LIKE 'interview_letters'"
+                    )
+                ) {
+
+                    $check =
+                        mysqli_query(
+                            $conn,
+                            "SHOW TABLES LIKE 'interview_letters'"
+                        );
+
+                    if (
+                        $check &&
+                        mysqli_num_rows($check) > 0
+                    ) {
+
+                        mysqli_query(
+                            $conn,
+                            "DELETE FROM interview_letters
+                             WHERE internship_id = $internship_id"
+                        );
+                    }
+                }
+
+
+                mysqli_query(
+                    $conn,
+                    "DELETE FROM questions
+                     WHERE internship_id = $internship_id"
                 );
             }
 
 
-            /* Suggestions */
+            mysqli_query(
+                $conn,
+                "DELETE FROM internships
+                 WHERE company_id = $company_user_id"
+            );
 
-            if (tableExists($conn, 'internship_suggestions')) {
+
+            /* Delete suggestions */
+
+            $check =
+                mysqli_query(
+                    $conn,
+                    "SHOW TABLES LIKE 'internship_suggestions'"
+                );
+
+            if (
+                $check &&
+                mysqli_num_rows($check) > 0
+            ) {
 
                 mysqli_query(
                     $conn,
                     "DELETE FROM internship_suggestions
-                     WHERE company_id = $user_id"
+                     WHERE company_id = $company_user_id"
                 );
             }
 
 
-            /* Company verification documents */
+            /* Delete notifications */
 
-            $documents = [];
-
-            $stmt = mysqli_prepare(
-                $conn,
-                "SELECT gst_certificate,
-                        company_registration_document,
-                        pan_document
-                 FROM company_verifications
-                 WHERE user_id = ?"
-            );
-
-            if ($stmt) {
-
-                mysqli_stmt_bind_param(
-                    $stmt,
-                    "i",
-                    $user_id
+            $check =
+                mysqli_query(
+                    $conn,
+                    "SHOW TABLES LIKE 'notifications'"
                 );
 
-                mysqli_stmt_execute($stmt);
+            if (
+                $check &&
+                mysqli_num_rows($check) > 0
+            ) {
 
-                $result = mysqli_stmt_get_result($stmt);
-
-                if ($row = mysqli_fetch_assoc($result)) {
-
-                    $documents[] = $row['gst_certificate'];
-                    $documents[] = $row['company_registration_document'];
-                    $documents[] = $row['pan_document'];
-                }
-
-                mysqli_stmt_close($stmt);
-            }
-
-
-            /* Delete company documents */
-
-            $upload_folder =
-                __DIR__ . '/../assets/uploads/company_verification/';
-
-
-            foreach ($documents as $document) {
-
-                if (!empty($document)) {
-
-                    $file = $upload_folder . $document;
-
-                    if (file_exists($file)) {
-                        unlink($file);
-                    }
-                }
+                mysqli_query(
+                    $conn,
+                    "DELETE FROM notifications
+                     WHERE user_id = $company_user_id"
+                );
             }
 
 
@@ -381,20 +332,8 @@ if (
             mysqli_query(
                 $conn,
                 "DELETE FROM company_verifications
-                 WHERE user_id = $user_id"
+                 WHERE id = $id"
             );
-
-
-            /* Delete notifications */
-
-            if (tableExists($conn, 'notifications')) {
-
-                mysqli_query(
-                    $conn,
-                    "DELETE FROM notifications
-                     WHERE user_id = $user_id"
-                );
-            }
 
 
             /* Delete company user */
@@ -402,27 +341,26 @@ if (
             mysqli_query(
                 $conn,
                 "DELETE FROM users
-                 WHERE id = $user_id
+                 WHERE id = $company_user_id
                  AND role = 'company'"
             );
         }
     }
 
 
-    /* Go back */
-
-    header("Location: companies.php");
+    header("Location: company_verification.php");
     exit();
 }
 
 
 /* =========================================================
-   GET COMPANIES
+   GET COMPANY VERIFICATION RECORDS
    ========================================================= */
 
 $sql = "
     SELECT
-        u.id,
+        cv.id AS verification_id,
+        cv.user_id,
         u.name,
         u.email,
         cv.gstin,
@@ -430,15 +368,26 @@ $sql = "
         cv.gst_status,
         cv.pan_status,
         cv.admin_status,
-        cv.admin_remark
-    FROM users u
+        cv.admin_remark,
+        cv.gst_certificate,
+        cv.company_registration_document,
+        cv.pan_document
+    FROM company_verifications cv
 
-    LEFT JOIN company_verifications cv
-        ON cv.user_id = u.id
+    INNER JOIN users u
+        ON u.id = cv.user_id
 
     WHERE u.role = 'company'
 
-    ORDER BY u.id DESC
+    ORDER BY
+        CASE cv.admin_status
+            WHEN 'Pending' THEN 1
+            WHEN 'Rejected' THEN 2
+            WHEN 'Approved' THEN 3
+            ELSE 4
+        END,
+
+        cv.id DESC
 ";
 
 
@@ -447,7 +396,6 @@ $result = mysqli_query($conn, $sql);
 ?>
 
 <!DOCTYPE html>
-
 <html lang="en">
 
 <head>
@@ -457,7 +405,7 @@ $result = mysqli_query($conn, $sql);
 <meta name="viewport"
       content="width=device-width, initial-scale=1.0">
 
-<title>Manage Companies</title>
+<title>Company Verification</title>
 
 
 <style>
@@ -468,204 +416,148 @@ $result = mysqli_query($conn, $sql);
     box-sizing: border-box;
 }
 
+
 body {
-
     font-family: Arial, sans-serif;
-
     background: #f4f6fb;
-
     color: #333;
-
 }
+
 
 .container {
-
     width: 95%;
-
-    max-width: 1300px;
-
+    max-width: 1400px;
     margin: 30px auto;
-
 }
 
-.top {
 
+.header {
     display: flex;
-
     justify-content: space-between;
-
     align-items: center;
-
-    margin-bottom: 20px;
-
+    margin-bottom: 25px;
 }
 
-.top h1 {
 
+.header h1 {
     color: #667eea;
-
 }
+
 
 .back {
-
     text-decoration: none;
-
     background: #667eea;
-
     color: white;
-
     padding: 10px 16px;
-
     border-radius: 8px;
-
 }
+
 
 .table-box {
-
     background: white;
-
-    border-radius: 12px;
-
     padding: 20px;
-
+    border-radius: 12px;
     box-shadow: 0 5px 15px rgba(0,0,0,.08);
-
     overflow-x: auto;
-
 }
+
 
 table {
-
     width: 100%;
-
     border-collapse: collapse;
-
 }
+
 
 th {
-
     background: #667eea;
-
     color: white;
-
     padding: 13px;
-
     text-align: left;
-
 }
+
 
 td {
-
     padding: 13px;
-
     border-bottom: 1px solid #eee;
-
     vertical-align: middle;
-
 }
+
 
 tr:hover {
-
     background: #f8f9ff;
-
 }
+
 
 .status {
-
     display: inline-block;
-
-    padding: 6px 10px;
-
+    padding: 7px 11px;
     border-radius: 20px;
-
     font-size: 13px;
-
     font-weight: bold;
-
 }
+
 
 .pending {
-
     background: #fff3cd;
-
     color: #856404;
-
 }
+
 
 .approved {
-
     background: #d4edda;
-
     color: #155724;
-
 }
+
 
 .rejected {
-
     background: #f8d7da;
-
     color: #721c24;
-
 }
+
 
 .btn {
-
     display: inline-block;
-
-    text-decoration: none;
-
-    padding: 7px 10px;
-
+    border: none;
+    padding: 8px 11px;
     border-radius: 6px;
-
     font-size: 12px;
-
     font-weight: bold;
-
     margin: 2px;
-
+    cursor: pointer;
 }
+
 
 .approve {
-
     background: #28a745;
-
     color: white;
-
 }
+
 
 .reject {
-
     background: #dc3545;
-
     color: white;
-
 }
+
 
 .remove {
-
     background: #343a40;
-
     color: white;
-
 }
 
-.info {
 
-    color: #777;
-
+.documents a {
+    display: block;
+    margin: 3px 0;
+    color: #667eea;
     font-size: 12px;
-
+    text-decoration: none;
 }
+
 
 .no-data {
-
     text-align: center;
-
-    color: #777;
-
     padding: 30px;
-
+    color: #777;
 }
 
 </style>
@@ -679,10 +571,10 @@ tr:hover {
 <div class="container">
 
 
-    <div class="top">
+    <div class="header">
 
         <h1>
-            🏢 Manage Companies
+            🏢 Company Verification
         </h1>
 
         <a
@@ -719,6 +611,8 @@ tr:hover {
 
                     <th>PAN Status</th>
 
+                    <th>Documents</th>
+
                     <th>Admin Status</th>
 
                     <th>Action</th>
@@ -737,11 +631,21 @@ tr:hover {
 <?php while ($row = mysqli_fetch_assoc($result)): ?>
 
 
+<?php
+
+$status = $row['admin_status'] ?? 'Pending';
+
+$verification_id =
+    (int)$row['verification_id'];
+
+?>
+
+
                 <tr>
 
 
                     <td>
-                        <?= (int)$row['id'] ?>
+                        <?= $verification_id ?>
                     </td>
 
 
@@ -777,18 +681,70 @@ tr:hover {
                     </td>
 
 
-                    <!-- ADMIN STATUS -->
+                    <td class="documents">
+
+
+<?php if (!empty($row['gst_certificate'])): ?>
+
+                        <a
+                            href="../assets/uploads/company_verification/<?= urlencode($row['gst_certificate']) ?>"
+                            target="_blank"
+                        >
+                            📄 GST Certificate
+                        </a>
+
+<?php endif; ?>
+
+
+<?php if (!empty($row['company_registration_document'])): ?>
+
+                        <a
+                            href="../assets/uploads/company_verification/<?= urlencode($row['company_registration_document']) ?>"
+                            target="_blank"
+                        >
+                            📄 Company Registration
+                        </a>
+
+<?php endif; ?>
+
+
+<?php if (!empty($row['pan_document'])): ?>
+
+                        <a
+                            href="../assets/uploads/company_verification/<?= urlencode($row['pan_document']) ?>"
+                            target="_blank"
+                        >
+                            📄 PAN Document
+                        </a>
+
+<?php endif; ?>
+
+
+<?php if (
+    empty($row['gst_certificate']) &&
+    empty($row['company_registration_document']) &&
+    empty($row['pan_document'])
+): ?>
+
+                        -
+
+<?php endif; ?>
+
+
+                    </td>
+
 
                     <td>
 
 
-<?php
-$status = $row['admin_status'] ?? 'Pending';
+<?php if ($status === 'Pending'): ?>
+
+                        <span class="status pending">
+                            ⏳ Pending
+                        </span>
 
 
-if ($status === 'Approved'):
-
-?>
+<?php elseif ($status === 'Approved'): ?>
 
                         <span class="status approved">
                             ✅ Approved
@@ -802,20 +758,11 @@ if ($status === 'Approved'):
                         </span>
 
 
-<?php else: ?>
-
-                        <span class="status pending">
-                            ⏳ Pending
-                        </span>
-
-
 <?php endif; ?>
 
 
                     </td>
 
-
-                    <!-- ACTION -->
 
                     <td>
 
@@ -823,44 +770,101 @@ if ($status === 'Approved'):
 <?php if ($status === 'Pending'): ?>
 
 
-                        <!-- ONLY PENDING GETS APPROVE / REJECT -->
+                        <!-- APPROVE -->
 
-                        <a
-                            href="companies.php?action=approve&id=<?= (int)$row['id'] ?>"
-                            class="btn approve"
-                            onclick="return confirm('Approve this company?');"
+                        <form
+                            method="POST"
+                            style="display:inline;"
                         >
-                            ✅ Approve
-                        </a>
+
+                            <input
+                                type="hidden"
+                                name="action"
+                                value="approve"
+                            >
+
+                            <input
+                                type="hidden"
+                                name="id"
+                                value="<?= $verification_id ?>"
+                            >
+
+                            <button
+                                type="submit"
+                                class="btn approve"
+                                onclick="return confirm('Approve this company?');"
+                            >
+                                ✅ Approve
+                            </button>
+
+                        </form>
 
 
-                        <a
-                            href="companies.php?action=reject&id=<?= (int)$row['id'] ?>"
-                            class="btn reject"
-                            onclick="return confirm('Reject this company?');"
+                        <!-- REJECT -->
+
+                        <form
+                            method="POST"
+                            style="display:inline;"
                         >
-                            ❌ Reject
-                        </a>
+
+                            <input
+                                type="hidden"
+                                name="action"
+                                value="reject"
+                            >
+
+                            <input
+                                type="hidden"
+                                name="id"
+                                value="<?= $verification_id ?>"
+                            >
+
+                            <button
+                                type="submit"
+                                class="btn reject"
+                                onclick="return confirm('Reject this company?');"
+                            >
+                                ❌ Reject
+                            </button>
+
+                        </form>
 
 
 <?php elseif ($status === 'Approved'): ?>
 
 
-                        <!-- APPROVED GETS REMOVE -->
+                        <!-- REMOVE -->
 
-                        <a
-                            href="companies.php?action=remove&id=<?= (int)$row['id'] ?>"
-                            class="btn remove"
-                            onclick="return confirm('Remove this approved company permanently?');"
+                        <form
+                            method="POST"
+                            style="display:inline;"
                         >
-                            🗑 Remove Company
-                        </a>
+
+                            <input
+                                type="hidden"
+                                name="action"
+                                value="remove"
+                            >
+
+                            <input
+                                type="hidden"
+                                name="id"
+                                value="<?= $verification_id ?>"
+                            >
+
+                            <button
+                                type="submit"
+                                class="btn remove"
+                                onclick="return confirm('Remove this approved company permanently?');"
+                            >
+                                🗑 Remove Company
+                            </button>
+
+                        </form>
 
 
 <?php elseif ($status === 'Rejected'): ?>
 
-
-                        <!-- REJECTED GETS NO APPROVE/REJECT -->
 
                         <span class="status rejected">
                             ❌ Rejected
@@ -885,10 +889,10 @@ if ($status === 'Approved'):
                 <tr>
 
                     <td
-                        colspan="9"
+                        colspan="10"
                         class="no-data"
                     >
-                        No companies found.
+                        No company verification records found.
                     </td>
 
                 </tr>

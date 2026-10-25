@@ -309,6 +309,22 @@ body {
 }
 
 
+/* Clean table-first layout */
+.applications-table-wrap{width:100%;overflow-x:auto;background:#fff;border:1px solid #e5e9f5;border-radius:14px;box-shadow:0 6px 22px rgba(30,50,100,.07);margin:22px 0}
+.applications-table{width:100%;min-width:1000px;border-collapse:separate;border-spacing:0;font-size:14px}
+.applications-table thead th{background:#3549a6;color:#fff;padding:15px 13px;text-align:left;white-space:nowrap;font-weight:700}
+.applications-table tbody td{padding:15px 13px;border-bottom:1px solid #edf0f7;vertical-align:middle;background:#fff}
+.applications-table tbody tr:hover td{background:#f8faff}
+.applications-table tbody tr:last-child td{border-bottom:0}
+.application-table-row .student-cell strong{font-size:15px;color:#202b48}
+.application-table-row small{color:#69738b;line-height:1.5}
+.table-actions{display:flex;flex-wrap:wrap;gap:7px;min-width:180px}
+.table-action-btn{border:0;border-radius:8px;padding:9px 12px;font-weight:700;cursor:pointer;font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.btn-view-details{background:#e9edff;color:#3549a6}
+.btn-view-attempts{background:#242a35;color:#fff}
+.application-details-inline{display:none;margin:12px 0 4px;padding:18px!important;border:1px solid #e4e9f5;box-shadow:none!important;grid-column:1/-1}
+.application-details-inline.details-open{display:block}
+.full-details-cell{min-width:220px}
 .application-card {
 
     background: white;
@@ -893,6 +909,83 @@ body {
 
 }
 
+
+/* Application summary table */
+.applications-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 5px 18px rgba(0,0,0,0.08);
+    margin: 22px 0 30px;
+}
+.applications-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 850px;
+}
+.applications-table th, .applications-table td {
+    padding: 13px 15px;
+    text-align: left;
+    border-bottom: 1px solid #e9edf5;
+    font-size: 14px;
+    vertical-align: middle;
+}
+.applications-table th {
+    background: #3548a8;
+    color: #fff;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.applications-table tbody tr:hover { background: #f6f8ff; }
+.applications-table tbody tr:last-child td { border-bottom: 0; }
+.table-status { display: inline-block; padding: 6px 10px; border-radius: 18px; font-size: 12px; font-weight: 700; }
+.table-status.pending { background: #fff3cd; color: #856404; }
+.table-status.shortlisted { background: #d1e7dd; color: #0f5132; }
+.table-status.rejected { background: #f8d7da; color: #842029; }
+.view-application-btn { display: inline-block; padding: 7px 11px; border-radius: 6px; background: #3548a8; color: #fff; text-decoration: none; font-size: 12px; white-space: nowrap; }
+.view-application-btn:hover { background: #253580; }
+
+
+/* Keep every applicant's full information inside the applications table. */
+.full-details-table { min-width: 1500px; }
+.full-details-table th, .full-details-table td { vertical-align: top; }
+.full-details-table .application-table-row > td { padding: 14px 12px; }
+.full-details-cell { min-width: 520px; max-width: 760px; }
+.application-details-inline { border: 0 !important; box-shadow: none !important; background: transparent !important; padding: 8px 0 !important; margin: 0 !important; width: auto !important; }
+.application-details-inline .application-header { display: none; }
+
+/* Modal popup for View Details / View Attempts */
+body.application-modal-open { overflow: hidden; }
+body.application-modal-open::before {
+    content: ""; position: fixed; inset: 0; background: rgba(15,23,42,.62);
+    z-index: 9998; backdrop-filter: blur(3px);
+}
+.application-details-inline.details-open {
+    display: block !important; position: fixed !important; z-index: 9999 !important;
+    top: 50% !important; left: 50% !important; transform: translate(-50%,-50%) !important;
+    width: min(1000px, calc(100vw - 32px)) !important;
+    max-width: calc(100vw - 32px) !important; max-height: 86vh !important;
+    overflow: auto !important; box-sizing: border-box !important;
+    margin: 0 !important; padding: 28px !important; background: #fff !important;
+    border: 1px solid #dce3f3 !important; border-radius: 18px !important;
+    box-shadow: 0 24px 80px rgba(0,0,0,.3) !important;
+}
+.application-modal-close {
+    position: sticky; top: 0; float: right; z-index: 3; border: 0;
+    border-radius: 9px; background: #242a35; color: #fff; font-weight: 700;
+    padding: 10px 15px; cursor: pointer; margin: 0 0 14px 14px;
+}
+.application-details-inline.attempts-only > :not(.application-modal-close):not(.attempts-notice):not(.test-section) { display:none !important; }
+.application-details-inline.attempts-only .test-section { display:block !important; }
+.application-details-inline.attempts-only .attempts-notice { display:block !important; }
+/* View Details popup should not include mock-test performance/history. */
+.application-details-inline.details-only .test-section { display:none !important; }
+.application-details-inline.details-only .attempts-notice { display:none !important; }
+@media(max-width:600px) {
+ .application-details-inline.details-open { width:calc(100vw - 18px)!important; max-width:calc(100vw - 18px)!important; max-height:92vh!important; padding:16px!important; }
+}
+
 </style>
 
 </head>
@@ -1017,6 +1110,25 @@ body {
 
     <?php endif; ?>
 
+
+    <!-- ALL APPLICATION INFORMATION IN ONE TABLE -->
+    <?php if (mysqli_num_rows($result) > 0): ?>
+        <div class="applications-table-wrap">
+            <table class="applications-table full-details-table">
+                <thead>
+                    <tr>
+                        <th># / Application ID</th>
+                        <th>Student</th>
+                        <th>Email</th>
+                        <th>Internship</th>
+                        <th>Applied On</th>
+                        <th>Skill Match</th>
+                        <th>Status</th>
+                        <th>Resume, Mock Test History & Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+    <?php endif; ?>
 
     <?php while (
         $row = mysqli_fetch_assoc($result)
@@ -1244,9 +1356,8 @@ body {
         mysqli_stmt_close(
             $test_stmt
         );
-
-
-        $has_test =
+        
+                $has_test =
             count($test_results) > 0;
 
 
@@ -1256,8 +1367,9 @@ body {
 
         $max_attempts_reached =
             ($level1_attempts >= 5) &&
-            !$final_level2_passed;
+            !$final_test_passed;
 
+        
 
         /* ==================================================
            EXISTING INTERVIEW LETTER
@@ -1328,11 +1440,37 @@ body {
         ?>
 
 
-        <!-- ==================================================
-             APPLICATION CARD
-        ================================================== -->
-
-        <div class="application-card">
+        <?php
+        $table_skill_match = calculateSkillMatch(
+            $row["student_skills"] ?? "",
+            $row["internship_skills"] ?? ""
+        );
+        $table_status = strtolower($row["application_status"] ?? "pending");
+        $table_status_class = in_array($table_status, ["pending", "shortlisted", "rejected"], true) ? $table_status : "pending";
+        ?>
+        <tr class="application-table-row" id="application-<?= $application_id ?>">
+            <td>#<?= $application_id ?></td>
+            <td>
+                <strong><?= htmlspecialchars($row["student_name"] ?? "") ?></strong><br>
+                <small>Education: <?= htmlspecialchars($row["education"] ?: "Not provided") ?></small><br>
+                <small>Skills: <?= htmlspecialchars($row["student_skills"] ?: "Not provided") ?></small>
+            </td>
+            <td><?= htmlspecialchars($row["student_email"] ?? "") ?></td>
+            <td>
+                <strong><?= htmlspecialchars($row["internship_title"] ?? "") ?></strong><br>
+                <small>Required skills: <?= htmlspecialchars($row["internship_skills"] ?: "Not provided") ?></small>
+            </td>
+            <td><?= !empty($row["applied_at"]) ? date("d-m-Y h:i A", strtotime($row["applied_at"])) : "—" ?></td>
+            <td><strong><?= (int)$table_skill_match ?>%</strong><div class="progress" style="min-width:100px"><div class="progress-bar" style="width:<?= (int)$table_skill_match ?>%"><?= (int)$table_skill_match ?>%</div></div></td>
+            <td><span class="table-status <?= htmlspecialchars($table_status_class) ?>"><?= htmlspecialchars($row["application_status"] ?? "Pending") ?></span></td>
+            <td class="full-details-cell">
+        <div class="table-actions">
+            <button type="button" class="table-action-btn btn-view-details" onclick="toggleApplicationDetails(<?= $application_id ?>)">👁 View Details</button>
+            <button type="button" class="table-action-btn btn-view-attempts" onclick="toggleApplicationAttempts(<?= $application_id ?>)">🎥 View Attempts</button>
+        </div>
+        <!-- Expanded only when requested; keeps the main table compact and avoids repeated details on screen. -->
+        <div class="application-card application-details-inline" id="application-details-<?= $application_id ?>">
+            <div class="attempts-notice" id="attempts-notice-<?= $application_id ?>" style="display:none;color:#5367c9;font-weight:600;margin-bottom:12px">Mock test attempts and recordings are shown below.</div>
 
 
             <!-- ==================================================
@@ -2238,12 +2376,16 @@ body {
 
             </div>
 
-
         </div>
-
+            </td>
+        </tr>
 
     <?php endwhile; ?>
-
+    <?php if (isset($result) && mysqli_num_rows($result) > 0): ?>
+                </tbody>
+            </table>
+        </div>
+    <?php endif; ?>
 
 </div>
 
@@ -2304,6 +2446,59 @@ function prepareReject(form) {
 </script>
 
 
+
+<script>
+function closeApplicationModal() {
+    document.querySelectorAll('.application-details-inline.details-open').forEach(function(panel) {
+        panel.classList.remove('details-open', 'attempts-only', 'details-only');
+        panel.style.display = '';
+    });
+    document.body.classList.remove('application-modal-open');
+}
+function openApplicationModal(id, mode) {
+    closeApplicationModal();
+    const panel = document.getElementById('application-details-' + id);
+    if (!panel) { alert('Application details not found.'); return; }
+    panel.classList.add('details-open');
+    document.body.classList.add('application-modal-open');
+    const testSection = panel.querySelector('.test-section');
+    const notice = document.getElementById('attempts-notice-' + id);
+    let closeBtn = panel.querySelector('.application-modal-close');
+    if (!closeBtn) {
+        closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'application-modal-close';
+        closeBtn.textContent = '✕ Close';
+        closeBtn.addEventListener('click', closeApplicationModal);
+        panel.insertBefore(closeBtn, panel.firstChild);
+    }
+    if (mode === 'attempts') {
+        if (!testSection) {
+            panel.classList.remove('attempts-only');
+            alert('Mock test history was not found for this application.');
+            return;
+        }
+        panel.classList.remove('details-only');
+        panel.classList.add('attempts-only');
+        testSection.style.display = 'block';
+        if (notice) notice.style.display = 'block';
+    } else {
+        panel.classList.remove('attempts-only');
+        panel.classList.add('details-only');
+        if (testSection) testSection.style.display = ''; 
+        if (notice) notice.style.display = 'none';
+    }
+    panel.scrollTop = 0;
+}
+function toggleApplicationDetails(id) { openApplicationModal(id, 'details'); }
+function toggleApplicationAttempts(id) { openApplicationModal(id, 'attempts'); }
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') closeApplicationModal();
+});
+document.addEventListener('click', function(event) {
+    if (event.target === document.querySelector('body.application-modal-open::before')) closeApplicationModal();
+});
+</script>
 </body>
 
 </html>

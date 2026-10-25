@@ -556,14 +556,7 @@ body {
     </a>
 
 
-    <a href="company_verification.php">
-        🏢 Company Verification
-
-        <?php if ($pending_verification > 0): ?>
-            (<?= $pending_verification ?>)
-        <?php endif; ?>
-
-    </a>
+    
 
 
     <a href="students.php">
@@ -586,9 +579,7 @@ body {
     </a>
 
 
-    <a href="mock_tests.php">
-        📝 Mock Tests
-    </a>
+
 
 
     <a href="suggestions.php">
@@ -817,10 +808,7 @@ body {
         <div class="quick">
 
 
-            <a href="company_verification.php">
-                🏢 Company Verification
-            </a>
-
+           
 
             <a href="students.php">
                 🎓 Manage Students
@@ -842,9 +830,6 @@ body {
             </a>
 
 
-            <a href="mock_tests.php">
-                📝 View Mock Tests
-            </a>
 
 
             <a href="suggestions.php">
